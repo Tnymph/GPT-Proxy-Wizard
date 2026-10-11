@@ -118,10 +118,11 @@ async function runEngine(kind, opts = {}) {
   return promise;
 }
 
-/** 提权执行（关闭全部）：以管理员身份重启本应用，用 --elevate-run 跑一次性任务 */
+/** 提权执行（关闭全部 / 清理辅助项）：以管理员身份重启本应用，用 --elevate-run 跑一次性任务 */
 async function runElevated(kind) {
   const exePath = process.execPath;
   const extra = `--elevate-run ${kind}`;
+  // 打包后 exe 本身就是应用（不需要 -AppPath）；开发模式才需要把应用目录传进去
   const args = app.isPackaged
     ? ['-ExePath', exePath, '-ExtraArgs', extra]
     : ['-ExePath', exePath, '-AppPath', ROOT, '-ExtraArgs', extra];
@@ -131,6 +132,49 @@ async function runElevated(kind) {
     return { ok: false, error: (r.stderr || r.stdout || '提权失败（可能取消了 UAC）').trim() };
   }
   return { ok: true, pid: Number(m[1]) };
+}
+
+/** 判断进程是否还活着（提权进程可能因权限返回 EPERM，同样视为存活） */
+function isProcessAlive(pid) {
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch (e) {
+    return Boolean(e && e.code === 'EPERM');
+  }
+}
+
+/**
+ * 等提权实例跑完，并把它的日志增量转发到界面（提权进程的输出无法直接回传管道）。
+ * @returns {Promise<boolean>} true = 已结束；false = 等待超时
+ */
+async function waitForElevatedRun(pid, timeoutMs = 180000) {
+  const logsDir = path.join(config.STATE_DIR, 'logs');
+  let file = null;
+  let offset = 0;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      if (!file) {
+        const cands = fs.readdirSync(logsDir)
+          .filter((f) => f.endsWith('.log'))
+          .map((f) => ({ f, m: fs.statSync(path.join(logsDir, f)).mtimeMs }))
+          .sort((a, b) => b.m - a.m);
+        if (cands.length) file = path.join(logsDir, cands[0].f);
+      }
+      if (file) {
+        const text = fs.readFileSync(file, 'utf8');
+        if (text.length > offset) {
+          const chunk = text.slice(offset);
+          offset = text.length;
+          if (win && !win.isDestroyed()) win.webContents.send('engine:log', chunk);
+        }
+      }
+    } catch { /* 读取竞态忽略 */ }
+    if (!isProcessAlive(pid)) return true;
+  }
+  return false;
 }
 
 /* ---------- 窗口 ---------- */
@@ -216,7 +260,9 @@ function registerIpc() {
         return { ok: code === 0, code };
       }
       const r = await runElevated('stop');
-      return r.ok ? { ok: true, elevated: true, pid: r.pid } : { ok: false, error: r.error };
+      if (!r.ok) return { ok: false, error: r.error };
+      const finished = await waitForElevatedRun(r.pid);
+      return { ok: true, elevated: true, pid: r.pid, finished };
     } catch (e) {
       return { ok: false, error: String(e && e.message ? e.message : e) };
     }
@@ -283,7 +329,9 @@ function registerIpc() {
       const needElevate = apply && r.facts.taskExists && !r.facts.taskDeleted;
       if (needElevate && !(await apps.isAdmin())) {
         const e = await runElevated('cleanup');
-        return e.ok ? { ok: true, elevated: true, pid: e.pid } : { ok: false, error: e.error };
+        if (!e.ok) return { ok: false, error: e.error };
+        const finished = await waitForElevatedRun(e.pid);
+        return { ok: true, elevated: true, pid: e.pid, finished };
       }
       return { ok: true, facts: r.facts };
     } catch (e) {
@@ -410,8 +458,10 @@ if (ELEVATE_RUN) {
   app.whenReady().then(async () => {
     let code = 3;
     try {
-      if (ELEVATE_RUN === 'stop') code = await stopMod.run({ elevated: true });
-      else if (ELEVATE_RUN === 'start') code = await startMod.run({});
+      // 支持 --dry-run：提权实例可以只做只读检查（用于自检/排障，不会改任何设置）
+      const elevatedDryRun = argv.includes('--dry-run');
+      if (ELEVATE_RUN === 'stop') code = await stopMod.run({ elevated: true, dryRun: elevatedDryRun });
+      else if (ELEVATE_RUN === 'start') code = await startMod.run({ dryRun: elevatedDryRun });
       else if (ELEVATE_RUN === 'cleanup') code = (await cleanupMod.run({ apply: true, restoreBackups: true })).code;
       else log.err(`未知的 --elevate-run 动作：${ELEVATE_RUN}`);
     } catch (e) {

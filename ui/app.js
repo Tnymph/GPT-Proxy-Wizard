@@ -608,8 +608,11 @@ function renderSettings() {
     consoleAppend('\n=== 开始执行「清理辅助项」 ===\n');
     try {
       const r = await window.gptw.cleanup({ apply: true });
-      if (r.ok && r.elevated) toast('已在提权窗口继续执行清理，稍后可查看日志');
-      else toast(r.ok ? '清理完成（详见运行输出）' : '清理未完成：' + r.error);
+      if (r.ok && r.elevated) {
+        toast(r.finished ? '已通过 UAC 提权完成清理（详见运行输出）' : '提权实例仍在后台执行清理，稍后可查看日志');
+      } else {
+        toast(r.ok ? '清理完成（详见运行输出）' : '清理未完成：' + r.error);
+      }
     } finally {
       setBusy(false);
     }
@@ -760,8 +763,13 @@ function bindGlobal() {
     consoleAppend('\n=== 开始执行「关闭全部」 ===\n');
     try {
       const r = await window.gptw.stop({ allowElevate: true });
-      if (r.ok && r.elevated) toast('已在提权窗口继续执行，完成后可点"重新检查"查看结果');
-      else toast(r.ok ? '关闭流程完成' : `关闭流程未全部完成${r.error ? '：' + r.error : ''}`);
+      if (r.ok && r.elevated) {
+        toast(r.finished
+          ? '已通过 UAC 提权执行完成（详见运行输出与检查结果）'
+          : '提权实例仍在后台执行，稍后可点"重新检查"查看结果');
+      } else {
+        toast(r.ok ? '关闭流程完成' : `关闭流程未全部完成${r.error ? '：' + r.error : ''}`);
+      }
     } catch (e) {
       toast('执行异常：' + (e && e.message ? e.message : e));
     } finally {
