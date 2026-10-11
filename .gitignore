@@ -1,0 +1,24 @@
+# --- 依赖与构建产物 ---
+node_modules/
+dist/
+out/
+release/
+
+# --- 运行期状态（日志可能含 IP/用户名，绝不提交）---
+state/
+*.log
+
+# --- 隐私目录：真实私密值只放这里，其余一律不提交 ---
+private/*
+!private/README.md
+
+# --- 备份/临时文件 ---
+*.gptproxy-backup
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db
+
+# --- 工具/扫描器的工作目录（可能含本机用户名等弱标识）---
+.mimosa/
+.claude-hooks/

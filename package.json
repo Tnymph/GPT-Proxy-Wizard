@@ -1,0 +1,62 @@
+{
+  "name": "gpt-proxy-wizard",
+  "productName": "GPT Proxy Wizard",
+  "version": "0.1.0",
+  "description": "Wizard-style Windows app that guides, configures and verifies a ChatGPT/Codex desktop setup running through a US static-IP outlet (Clash Verge + optional Roxy / self-provided static proxy).",
+  "private": true,
+  "type": "commonjs",
+  "main": "main/main.js",
+  "scripts": {
+    "gui": "electron .",
+    "cli": "node engine/cli.js",
+    "check:dry": "node engine/cli.js start --dry-run",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win",
+    "secrets": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/scan-for-secrets.ps1 -Command secrets -Target .",
+    "lint": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/scan-for-secrets.ps1 -Command lint -Target ."
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.gptproxywizard.app",
+    "productName": "GPT Proxy Wizard",
+    "copyright": "MIT License · 仅包含我们自己的代码，不捆绑任何第三方软件",
+    "directories": { "output": "dist" },
+    "files": [
+      "app.js",
+      "engine/**/*",
+      "main/**/*",
+      "ui/**/*",
+      "README.md",
+      "LICENSE",
+      "LICENSES.md",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": ["engine/tools/**"],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "artifactName": "GPT-Proxy-Wizard-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "GPT Proxy Wizard",
+      "artifactName": "GPT-Proxy-Wizard-${version}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "GPT-Proxy-Wizard-${version}-portable.${ext}"
+    }
+  }
+}

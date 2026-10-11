@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>GPT Proxy Wizard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-title">GPT Proxy Wizard</div>
+        <div class="brand-sub">ChatGPT 美国出口配置向导</div>
+      </div>
+      <nav id="nav">
+        <button class="nav-item active" data-page="dashboard">仪表盘</button>
+        <button class="nav-item" data-page="wizard">向导</button>
+        <button class="nav-item" data-page="check">检查</button>
+        <button class="nav-item" data-page="settings">设置</button>
+        <button class="nav-item" data-page="logs">日志</button>
+      </nav>
+      <div class="side-foot">
+        <div id="modeBadge" class="badge">出口模式：--</div>
+        <button id="btnCopyEnv" class="link-btn">打开配置目录</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <h1 id="pageTitle">仪表盘</h1>
+        <div class="top-actions">
+          <span id="busy" class="busy hidden">执行中…</span>
+          <button id="btnRefresh" class="btn ghost">重新检查</button>
+          <button id="btnStart" class="btn primary">启动 GPT</button>
+          <button id="btnStop" class="btn danger ghost">关闭全部</button>
+        </div>
+      </header>
+
+      <section id="page-dashboard" class="page active"></section>
+      <section id="page-wizard" class="page"></section>
+      <section id="page-check" class="page"></section>
+      <section id="page-settings" class="page"></section>
+      <section id="page-logs" class="page"></section>
+
+      <div class="console-wrap">
+        <div class="console-head">
+          <span>运行输出</span>
+          <button id="btnClearConsole" class="link-btn">清空</button>
+        </div>
+        <pre id="console" class="console"></pre>
+      </div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
