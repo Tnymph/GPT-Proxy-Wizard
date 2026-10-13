@@ -2,7 +2,7 @@
 
 > 🪄 本仓库是 **deepseek 许愿式编程产物**：由人提出需求，模型负责设计、实现、自测与交付。
 >
-> **维护状态：后续停止更新（frozen）**——最后一次功能更新为 **v0.1.1**（2026-10-11）。
+> **维护状态：后续停止更新（frozen）**——最后一次功能更新为 **v0.1.2**（2026-10-13，小修：Roxy 缓存目录可配置 + 自动探测）。
 > 接手这个项目需要的一切都在本文件里；读完 §1~§4 就能上手改代码，§5~§8 是流程与避坑清单。
 
 ---
@@ -12,11 +12,11 @@
 | 项 | 值 |
 |---|---|
 | 仓库 | https://github.com/Tnymph/GPT-Proxy-Wizard （PUBLIC，MIT） |
-| 最新发布 | **v0.1.1**（安装器 + 便携版 + SHA256SUMS，GitHub Latest） |
-| 历史发布 | **v0.1.0**（保留；标记为"预发布"并在说明里注明已知问题："关闭全部"提权不弹 UAC，已在 v0.1.1 修复） |
+| 最新发布 | **v0.1.2**（安装器 + 便携版 + SHA256SUMS，GitHub Latest） |
+| 历史发布 | **v0.1.1**（修复"关闭全部"提权）、**v0.1.0**（标记为"预发布"，说明里注明已知问题），两者**都保留** |
 | 发布策略 | **已发布的 Release 永不删除**；有问题的版本在新版修复 + 旧版说明里标注（用 Latest / 预发布 控制推荐下载哪个） |
-| 已实测通过 | CLI 干跑（`start/stop/cleanup --dry-run`）、11 项检查、打包版实机启动与检查、提权链路（UAC → 提权实例跑只读 dry-run → 日志落盘 → 干净退出） |
-| 尚未验证 | **干净虚拟机上的安装/卸载与完整向导**（见 §7 待办 1）；"真的执行关闭/启动"只在本机跑过只读路径 |
+| 已实测通过 | CLI 干跑（`start/stop/cleanup --dry-run`）、11 项检查、打包版实机启动与检查、提权链路（UAC → 提权实例跑只读 dry-run → 日志落盘 → 干净退出）、Roxy 缓存目录迁移（配置根目录 + 自动探测两条路径） |
+| 尚未验证 | **干净虚拟机上的安装/卸载与完整向导**（见 §7 待办 1）；"真的执行关闭/启动"只在本机跑过只读路径；v0.1.2 新增的界面上那个输入框只做过静态检查（语法 + 接口面），未点过 |
 | 用户配置与日志 | `%APPDATA%\GPTProxyWizard\`（`config.json` + `state\logs\`，日志默认遮罩） |
 | 本机开发目录（示例） | `E:\VibeCoding\GPTAppPackaging\app`（工作区里的 `handover\` 目录是私有资料，**不在本仓库**） |
 
@@ -62,6 +62,7 @@ app/
 5. **单实例锁 + 看门狗**：锁文件在 `%APPDATA%\GPTProxyWizard\state`（死 PID/超 10 分钟可接管）；看门狗 10 分钟兜底——**必须 `clearTimeout`**，界面模式下传 `watchdogExit:false`（见 §8 坑 1）。
 6. **不捆绑第三方**：只做"检测 → 引导到官方渠道 → 复查"；`LICENSES.md` 写明了 Clash Verge/Roxy/ChatGPT 的分发边界。
 7. **一切外部命令走参数数组**（不经 shell），可执行文件受白名单约束（`lib/exec.js` 的 `resolveAllowedApp`）；"启动程序"这个动作统一交给 `tools/launch-app.ps1` 执行。
+8. **Roxy 数据目录可迁移**：窗口名 ↔ dirId 的反查依赖"缓存根目录"。默认 `%APPDATA%\RoxyBrowser\browser-cache`，但 Roxy 设置里可以把缓存改到别的盘 —— 因此 `config.roxy.browserCacheDirsExtra`（数组）可手填多个根目录，`lib/roxynet.js` 的 `cacheRoots()/lumiPath()/listWindowDirs()` 会在全部候选根里查找；`detect.ensureRoxyCacheRoots()` 还会在"找不到配置的窗口"时自动探测各盘常见位置（`probeRoxyCacheRoots()`，内存态补进配置），`tools/dev-set-roxy-cache.js` 可把探测结果固化进配置文件。**不要**把反查逻辑改回"只认默认目录"。
 
 ---
 
@@ -75,6 +76,7 @@ app/
 | 卡片/向导里的"打开…" | `node app.js open clash\|roxy\|window\|chatgpt [--wait 秒]` | 打开并核对是否真的起来（检查路径用） |
 | 设置 → 维护 → 清理辅助项 | `node app.js cleanup [--apply]` | 删助手任务 / 关本方案设置的系统代理 / 还原扩展文件备份 |
 | 设置 → 维护 → 导出/导入配置 | `node app.js config path\|show\|init` | 配置读写（导出文件含私密值，别外传） |
+| 设置 → Roxy 缓存根目录（+自动探测） | `node tools/dev-set-roxy-cache.js` | 缓存被挪到别的盘时，告诉程序去哪儿找窗口数据（运行期也会自动探测） |
 
 退出码：`0` 成功 · `1` 有失败项/已有实例在跑 · `2` 配置或步骤错误 · `3` 未预期异常 · `10` 已提权到新窗口继续执行。
 
@@ -92,6 +94,8 @@ npm run dist                    :: 出安装器 + 便携版
 npm run lint / npm run secrets  :: 编码规则 / 脱敏扫描（发布前必跑，0 命中）
 node tools/dev-watchdog-smoke.js   :: 看门狗回归（用 GPTWIZ_WATCHDOG_MIN=1 缩短）
 node tools/dev-migrate-config.js   :: 把旧的本地配置迁进 %APPDATA%（纯文本解析，不执行源码）
+node tools/dev-set-roxy-cache.js   :: 探测本机 Roxy 缓存根目录并写进配置（缓存挪到别的盘后用）
+npx electron tools/dev-ui-smoke.js :: 界面回归：不可见窗口里跑真实渲染逻辑（桩 IPC），验证配置读写链路
 ```
 
 国内网络提示：`npm install` / 打包时用镜像环境变量
@@ -140,6 +144,9 @@ git 凭据已配好（fetch 走 ghfast 加速、push 直连、凭据助手用 gh
 8. **TUN 开启时没有"真·直连"**：任何直连请求也会被 TUN 接管，`egressDirect` 只在 Clash 已停（如"关闭全部"终检）时才有意义。
 9. **安全钩子（Mimosa）**：`spawn/execFile(变量路径)`、动态 `require(变量)`、argv→fs 路径、"带路径参数的函数"都会被拦 —— 替代写法见 `tools/` 里的现有实现（白名单 + 参数数组；纯字面量常量路径）。
 10. **提交前扫描**：`npm run secrets`（含 `-Aggressive`）应 0 命中；`dist\builder-debug.yml` 含本机路径，别提交（`dist/` 已 gitignore，但脚本扫描时记得排除或删掉它）。
+11. **Roxy 缓存目录被改过 → "找不到窗口"**：用户把 Roxy 的"浏览器缓存目录"设到别的盘（例如 `E:\BrowserCache`）后，默认目录里的旧窗口数据会让"窗口名 → dirId"反查失败，表现为"本机 Roxy 数据里找不到该窗口"。修法见 §3 决策 8（多根目录 + 自动探测）。**"窗口是否已打开"不依赖缓存目录**（走命令行 `--dir-id`），只有"窗口没开、要按名字反查"时才需要它。
+12. **配置文件可能带 BOM**：记事本 / PowerShell 5.1 `Set-Content -Encoding UTF8` 存出来的 JSON 带 `EF BB BF`，`JSON.parse` 会直接抛错（表现为"配置全变默认值"）。`engine/config.js` 与界面导入路径现在都会先剥 BOM；新加读配置的地方请照做。
+13. **`GPTWIZ_HOME` 测试时用 Windows 路径**：在 Git Bash 里传 `"$LOCALAPPDATA"\Temp\xxx` 这类值（别用 `/c/...` 形式），否则 Node 会解析成别的盘上的相对路径，读不到你准备的测试配置。
 
 ---
 

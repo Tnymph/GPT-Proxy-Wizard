@@ -64,6 +64,8 @@ function persistConfig() {
     roxy: {
       appExe: config.roxy.appExe,
       userDataDir: config.roxy.userDataDir,
+      browserCacheDir: config.roxy.browserCacheDir,
+      browserCacheDirsExtra: config.roxy.browserCacheDirsExtra,
       windowName: config.roxy.windowName,
       workspaceId: config.roxy.workspaceId,
       expectedStaticIp: config.roxy.expectedStaticIp,
@@ -106,7 +108,9 @@ async function runEngine(kind, opts = {}) {
   const promise = (async () => {
     try {
       // 启动时的探测是异步的（可能还没跑完），执行前再确保一次：路径缺失时自动补上
-      await detect.autoFill();
+      const auto = await detect.autoFill();
+      // 探测到的提示（例如"自动识别 Roxy 缓存目录"）转发到界面的运行输出里
+      if (auto && auto.notes) for (const n of auto.notes) log.warn(n);
       // watchdogExit:false —— 界面模式不因为"看门狗超时"杀掉整个应用（引擎自己会清定时器，这里是第二道保险）
       return await mod.run({ watchdogExit: false, ...opts });
     } finally {
@@ -284,6 +288,8 @@ function registerIpc() {
     roxy: {
       appExe: config.roxy.appExe,
       userDataDir: config.roxy.userDataDir,
+      browserCacheDir: config.roxy.browserCacheDir,
+      browserCacheDirsExtra: Array.isArray(config.roxy.browserCacheDirsExtra) ? config.roxy.browserCacheDirsExtra : [],
       windowName: config.roxy.windowName,
       workspaceId: config.roxy.workspaceId,
       expectedStaticIp: config.roxy.expectedStaticIp,
@@ -374,7 +380,8 @@ function registerIpc() {
     });
     if (r.canceled || !r.filePaths.length) return { ok: false, canceled: true };
     try {
-      const text = fs.readFileSync(r.filePaths[0], 'utf8');
+      let text = fs.readFileSync(r.filePaths[0], 'utf8');
+      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);   // 容忍带 BOM 的导入文件
       const data = JSON.parse(text);
       if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: '文件内容不是配置对象' };
       applyConfigPatch(data);
@@ -389,6 +396,15 @@ function registerIpc() {
       // 只返回窗口名（不含 dirId 等敏感细节）
       const names = roxynet.listWindowNames().map((w) => w.windowName);
       return { ok: true, names };
+    } catch (e) {
+      return { ok: false, error: String(e && e.message ? e.message : e) };
+    }
+  });
+
+  // 探测 Roxy 的"浏览器缓存根目录"（用户在 Roxy 设置里可能把缓存挪到了别的盘）
+  ipcMain.handle('roxy:probeCacheRoots', () => {
+    try {
+      return { ok: true, roots: detect.probeRoxyCacheRoots() };
     } catch (e) {
       return { ok: false, error: String(e && e.message ? e.message : e) };
     }

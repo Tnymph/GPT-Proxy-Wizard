@@ -19,12 +19,41 @@ const R = config.roxy;
 //   ① RoxyBrowser.exe --roxy-action launch-browser --dir-id <32hex> --workspace-id <n>   （本机实测）
 //   ② --user-data-dir=...\browser-cache\<32hex>                                          （另一形态）
 const RE_DIR_ID_CLI = /--dir-id[=\s]+([0-9a-f]{32})/i;
-const RE_USER_DATA_DIR = /--user-data-dir="?([^"]*browser-cache[\\/][0-9a-f]{32})"?/;
+// 任意缓存根都要认（用户可能把 Roxy 的缓存目录改到别的盘，目录名不必含 browser-cache）
+const RE_USER_DATA_DIR = /--user-data-dir="?([^"]*[\\/][0-9a-f]{32})"?/;
+
+/** 全部候选缓存根目录（主目录 + 额外候选；去重、只保留真实存在的） */
+function cacheRoots() {
+  const list = [R.browserCacheDir, ...(Array.isArray(R.browserCacheDirsExtra) ? R.browserCacheDirsExtra : [])];
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    if (!item) continue;
+    const root = path.resolve(String(item));
+    const key = root.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (fs.existsSync(root)) out.push(root);
+  }
+  return out;
+}
+
+/** 在全部候选根里找某个窗口的 lumi.conf */
+function lumiPath(dirId) {
+  for (const root of cacheRoots()) {
+    const file = path.join(root, dirId, 'lumi.conf');
+    if (fs.existsSync(file)) return file;
+  }
+  return null;
+}
 
 /* ---------- lumi.conf 解密 ---------- */
 
 function decryptLumi(dirId) {
-  const file = path.join(R.browserCacheDir, dirId, 'lumi.conf');
+  const file = lumiPath(dirId);
+  if (!file) {
+    throw new Error(`未找到窗口数据（dirId=${dirId}）：若你在 Roxy 设置里改过"浏览器缓存目录"，请在设置里把它填进"Roxy 缓存根目录"`);
+  }
   const raw = fs.readFileSync(file, 'utf8').trim();
   const buf = Buffer.from(raw, 'base64');
   const tag = buf.subarray(buf.length - 16);
@@ -35,12 +64,15 @@ function decryptLumi(dirId) {
   return JSON.parse(plain);
 }
 
+/** 全部候选根里的窗口目录（dirId 集合，跨根去重） */
 function listWindowDirs() {
-  try {
-    return fs.readdirSync(R.browserCacheDir).filter((d) => /^[0-9a-f]{32}$/.test(d));
-  } catch {
-    return [];
+  const ids = new Set();
+  for (const root of cacheRoots()) {
+    let entries = [];
+    try { entries = fs.readdirSync(root); } catch { continue; }
+    for (const d of entries) if (/^[0-9a-f]{32}$/.test(d)) ids.add(d);
   }
+  return [...ids];
 }
 
 /** 解密扫描：windowName → dirId（窗口未打开时也能用） */
@@ -181,6 +213,8 @@ async function checkStaticEgress(port, dirId, attempts = 3) {
 
 module.exports = {
   decryptLumi,
+  cacheRoots,
+  lumiPath,
   listWindowDirs,
   listWindowNames,
   findDirIdByWindowName,

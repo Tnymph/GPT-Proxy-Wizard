@@ -137,7 +137,12 @@ async function collect({ quick = false } = {}) {
       if (!config.roxy.windowName) {
         add(6, '出口通道可达', STATUS.WARN, '尚未配置 Roxy 窗口名', ['在向导的"出口来源"里选择/填写窗口名']);
       } else if (!dirId) {
-        add(6, '出口通道可达', STATUS.FAIL, '本机 Roxy 数据里找不到该窗口', ['在向导里确认窗口名；如需新建，请先在 Roxy 里创建窗口']);
+        const roots = roxynet.cacheRoots();
+        add(6, '出口通道可达', STATUS.FAIL, '本机 Roxy 数据里找不到该窗口', [
+          '在向导里确认窗口名；如需新建，请先在 Roxy 里创建窗口',
+          '若你改过 Roxy 的「浏览器缓存目录」（设置 → 缓存/数据目录），请在「设置 → Roxy 缓存根目录」里填入新位置',
+          `当前查找的缓存目录：${roots.length ? roots.join('；') : '(无)'}`,
+        ]);
       } else if (!win) {
         add(6, '出口通道可达', STATUS.WARN, `窗口「${config.roxy.windowName}」当前未打开（静态通道在窗口打开时建立）`, ['点击"启动 GPT"会自动打开窗口并建立通道']);
       } else if (!port) {

@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('gptw', {
   openApp: (payload) => ipcRenderer.invoke('app:open', payload),
   checkPath: (payload) => ipcRenderer.invoke('app:checkPath', payload),
   listRoxyWindows: () => ipcRenderer.invoke('roxy:listWindows'),
+  probeRoxyCacheRoots: () => ipcRenderer.invoke('roxy:probeCacheRoots'),
   listClashNodes: () => ipcRenderer.invoke('clash:listNodes'),
   cleanup: (payload) => ipcRenderer.invoke('engine:cleanup', payload),
   exportConfig: () => ipcRenderer.invoke('config:export'),

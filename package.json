@@ -1,7 +1,7 @@
 {
   "name": "gpt-proxy-wizard",
   "productName": "GPT Proxy Wizard",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Wizard-style Windows app that guides, configures and verifies a ChatGPT/Codex desktop setup running through a US static-IP outlet (Clash Verge + optional Roxy / self-provided static proxy).",
   "private": true,
   "type": "commonjs",

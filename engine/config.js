@@ -101,7 +101,11 @@ const baseConfig = {
     expectedStaticIp: '',                 // 预期美国静态 IP（仅比对提示）
     localHttpPort: 45535,                 // Roxy 本地服务（用于确认主程序已起）
     userDataDir: '',                      // 空 = %APPDATA%\RoxyBrowser
-    browserCacheDir: '',                  // 空 = userDataDir\browser-cache
+    browserCacheDir: '',                  // 空 = userDataDir\browser-cache（Roxy 默认缓存根）
+    // 额外候选缓存根目录：在 Roxy 设置里把"浏览器缓存目录"改到别的盘时（例如 E:\BrowserCache），
+    // 填在这里（程序也会自动探测常见位置）。识别"窗口是否已打开"不依赖它；
+    // 只有"窗口未打开、需要按窗口名反查 dirId"时才需要。
+    browserCacheDirsExtra: [],
     // lumi.conf 解密参数（AES-256-GCM，硬编码于 Roxy 内核；仅用于解析窗口名 ↔ dirId）
     lumiKey: '402ead7d23b43b6d1e0528d4f99c59bd',
     lumiIv: '3a105229aa31',
@@ -147,7 +151,8 @@ function deepMerge(base, over) {
 
 function loadOverrides() {
   try {
-    const text = fs.readFileSync(CONFIG_PATH, 'utf8');
+    let text = fs.readFileSync(CONFIG_PATH, 'utf8');
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);   // 容忍带 BOM 的文件（记事本/PowerShell 另存过）
     const data = JSON.parse(text);
     return isPlainObject(data) ? data : {};
   } catch (e) {

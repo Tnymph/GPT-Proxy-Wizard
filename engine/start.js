@@ -173,8 +173,12 @@ async function run(opts = {}) {
     } else {
       const dirId = roxynet.findDirIdByWindowName(config.roxy.windowName);
       if (!dirId) {
+        const roots = roxynet.cacheRoots();
         return fatal(`找不到窗口「${config.roxy.windowName}」（本地数据里没有该窗口）`, [
           '请在 Roxy 里确认窗口名，或在向导的"出口来源"里重新选择窗口',
+          '若你在 Roxy 设置里改过「浏览器缓存目录」（把缓存挪到了别的盘/文件夹），'
+            + '请在「设置 → Roxy 缓存根目录」里填入新位置',
+          `当前查找的缓存目录：${roots.length ? roots.join('；') : '(无)'}`,
         ]);
       }
       facts.dirId = dirId;

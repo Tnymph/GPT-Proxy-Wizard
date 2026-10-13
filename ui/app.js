@@ -159,6 +159,41 @@ function openBtn(label, target) {
   return b;
 }
 
+/** Roxy 缓存根目录：界面里用分号分隔的文本，存进配置时转成数组 */
+function splitCacheDirs(text) {
+  return String(text || '').split(/[;\n，,]+/).map((s) => s.trim()).filter(Boolean);
+}
+
+/** "Roxy 缓存根目录"输入行（向导与设置页共用）：文本框 + 自动探测按钮 */
+function cacheDirsRow(cfg, rerender) {
+  if (cfg.roxy.browserCacheDirsText === undefined) {
+    cfg.roxy.browserCacheDirsText = (Array.isArray(cfg.roxy.browserCacheDirsExtra) ? cfg.roxy.browserCacheDirsExtra : []).join('; ');
+  }
+  const input = textInput(cfg.roxy.browserCacheDirsText, (v) => { cfg.roxy.browserCacheDirsText = v; }, '留空 = 只查默认缓存目录；多个用分号分隔');
+  const probe = el('button', 'btn ghost', '自动探测');
+  probe.addEventListener('click', async () => {
+    probe.disabled = true;
+    try {
+      const r = await window.gptw.probeRoxyCacheRoots();
+      if (!r.ok) { toast('探测失败：' + (r.error || '')); return; }
+      if (!r.roots.length) {
+        toast('未在常见位置找到 Roxy 缓存目录；请在 Roxy 设置里查看当前缓存位置后手动填入');
+        return;
+      }
+      const merged = [];
+      for (const p of splitCacheDirs(cfg.roxy.browserCacheDirsText).concat(r.roots)) {
+        if (!merged.some((x) => x.toLowerCase() === p.toLowerCase())) merged.push(p);
+      }
+      cfg.roxy.browserCacheDirsText = merged.join('; ');
+      rerender();
+      toast(`已找到 ${r.roots.length} 个 Roxy 缓存目录，记得点"保存"`);
+    } finally {
+      probe.disabled = false;
+    }
+  });
+  return { input, probe };
+}
+
 function renderDashboard() {
   const page = $('#page-dashboard');
   clear(page);
@@ -401,6 +436,11 @@ function renderWizard() {
     }
     gridRow(g2, '工作区 ID', maskedInput('workspaceId', cfg.roxy.workspaceId), el('span'));
     gridRow(g2, '预期静态 IP（可选）', maskedInput('expectedStaticIp', cfg.roxy.expectedStaticIp), el('span'));
+    const cdW = cacheDirsRow(cfg, renderWizard);
+    gridRow(g2, 'Roxy 缓存根目录（可选）', cdW.input, cdW.probe);
+    const cdHint = el('div', 'hint', 'Roxy 默认缓存目录在 %APPDATA%\\RoxyBrowser\\browser-cache；若你在 Roxy 设置里把它改到了别的盘（例如 E:\\BrowserCache），请把新目录填在上面（多个用分号分隔），或点"自动探测"。本程序会用它把"窗口名"对应到窗口数据，从而自动打开指纹窗口。');
+    cdHint.style.gridColumn = '1 / -1';
+    g2.appendChild(cdHint);
     const roxyRow = el('div', 'save-bar');
     roxyRow.appendChild(openBtn('打开 Roxy 主程序', 'roxy'));
     roxyRow.appendChild(openBtn('打开指纹窗口', 'window'));
@@ -497,6 +537,10 @@ function buildPatch(cfg, root) {
     },
     ui: { maskSensitive: cfg.ui.maskSensitive },
   };
+  // 缓存根目录在界面上是"分号分隔的文本"，落到配置里是数组（字段没渲染过就不要覆盖已有值）
+  if (cfg.roxy.browserCacheDirsText !== undefined) {
+    patch.roxy.browserCacheDirsExtra = splitCacheDirs(cfg.roxy.browserCacheDirsText);
+  }
   collectMaskedInputs(root, patch);
   return patch;
 }
@@ -557,6 +601,11 @@ function renderSettings() {
   });
   gridRow(g2, 'Roxy Browser', textInput(cfg.roxy.appExe, (v) => { cfg.roxy.appExe = v; }), p2);
   gridRow(g2, 'Clash 配置目录', textInput(cfg.clash.dataDir, (v) => { cfg.clash.dataDir = v; }), el('span'));
+  const cdS = cacheDirsRow(cfg, renderSettings);
+  gridRow(g2, 'Roxy 缓存根目录', cdS.input, cdS.probe);
+  const cdHintS = el('div', 'hint', '若在 Roxy 设置里改过「浏览器缓存目录」（例如挪到 E:\\BrowserCache），填在这里（多个用分号分隔）；留空 = 只用默认目录 %APPDATA%\\RoxyBrowser\\browser-cache。程序也会在找不到窗口时自动到常见位置探测一次。');
+  cdHintS.style.gridColumn = '1 / -1';
+  g2.appendChild(cdHintS);
   s2.appendChild(g2);
   page.appendChild(s2);
 

@@ -57,7 +57,7 @@ async function openTarget(target, { waitMs = 25000 } = {}) {
     if (!config.roxy.windowName) return { ok: false, message: '尚未配置 Roxy 窗口名（向导第 2 步）' };
     let dirId = null;
     try { dirId = roxynet.findDirIdByWindowName(config.roxy.windowName); } catch { dirId = null; }
-    if (!dirId) return { ok: false, message: `本机 Roxy 数据里找不到窗口「${config.roxy.windowName}」（请确认窗口名，或先在 Roxy 里创建窗口）` };
+    if (!dirId) return { ok: false, message: `本机 Roxy 数据里找不到窗口「${config.roxy.windowName}」（请确认窗口名；若在 Roxy 设置里改过「浏览器缓存目录」，请在「设置 → Roxy 缓存根目录」填入新位置）` };
     const existing = await roxynet.findOpenWindow(dirId, config.roxy.windowName, true);
     if (existing) return { ok: true, already: true, message: '指纹窗口已打开' };
     if (!config.roxy.workspaceId) return { ok: false, message: '尚未配置 Roxy 工作区 ID（向导第 2 步）' };
